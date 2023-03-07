@@ -33,7 +33,7 @@
     <scala.test.version>3.0.3</scala.test.version>
 
     <!-- Spark Version -->
-    <spark.version>2.4.0</spark.version>
+    <spark.version>2.4.3</spark.version>
 
     <!-- MQTT Client -->
     <mqtt.paho.client>1.1.0</mqtt.paho.client>
