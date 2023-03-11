@@ -17,4 +17,4 @@
 
 tech.odes.sql.streaming.mqtt.MQTTStreamSinkProvider
 tech.odes.sql.streaming.mqtt.MQTTStreamSourceProvider
-org.apache.spark.sql.mqtt.HDFSMQTTSourceProvider
+org.apache.spark.sql.mqtt.provider.HDFSMQTTSourceProvider

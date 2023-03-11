@@ -30,10 +30,10 @@
     <!-- Scala Version -->
     <scala.version>2.12.7</scala.version>
     <scala.binary.version>2.12</scala.binary.version>
-    <scala.test.version>3.0.3</scala.test.version>
+    <scala.test.version>3.1.4</scala.test.version>
 
     <!-- Spark Version -->
-    <spark.version>2.4.3</spark.version>
+    <spark.version>3.1.1</spark.version>
 
     <!-- MQTT Client -->
     <mqtt.paho.client>1.1.0</mqtt.paho.client>
