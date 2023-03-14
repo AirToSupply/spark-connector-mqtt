@@ -8,6 +8,7 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.mqtt.provider.MQTTStreamSourceProvider;
 import org.apache.spark.sql.streaming.StreamingQuery;
 
 import java.util.Arrays;
@@ -52,7 +53,7 @@ public final class JavaMQTTStreamWordCount {
         // Create DataFrame representing the stream of input lines from connection to mqtt server
         Dataset<String> lines = spark
                 .readStream()
-                .format("mqtt")
+                .format(MQTTStreamSourceProvider.class.getName())
                 .option("topic", topic)
                 .load(brokerUrl).selectExpr("CAST(payload AS STRING)").as(Encoders.STRING());
 

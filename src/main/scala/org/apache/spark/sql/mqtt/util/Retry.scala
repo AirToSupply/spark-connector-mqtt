@@ -22,6 +22,7 @@ object Retry {
       }
       catch {
         case e: Exception =>
+          e.printStackTrace()
           if (retryExceptions.contains(e.getClass) && (attempts == -1 || remaining > 0)) {
             Thread.sleep(pauseMs)
           } else {

@@ -1,5 +1,7 @@
 package org.apache.spark.sql.mqtt.write
 
+import org.apache.spark.TaskContext
+import org.apache.spark.api.java.JavaRDD.fromRDD
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.Attribute
@@ -22,8 +24,9 @@ object MQTTWriter extends Logging {
     val schema = queryExecution.analyzed.output
     validateQuery(schema, parameters)
     queryExecution.toRdd.foreachPartition { iter =>
-      val writeTask = new MQTTWriterTask(parameters, schema, topic, qos)
-      Utils.tryWithSafeFinally(writeTask.execute(iter))(writeTask.close())
+      val writeTask = new MQTTWriterTask(
+        TaskContext.get().partitionId(), parameters, schema, topic, qos)
+      writeTask.execute(iter)
     }
   }
 }

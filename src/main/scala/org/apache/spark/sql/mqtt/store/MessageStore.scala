@@ -5,6 +5,7 @@ import org.eclipse.paho.client.mqttv3.{MqttClientPersistence, MqttPersistable, M
 
 import java.io._
 import java.util
+import scala.reflect.ClassTag
 import scala.util.Try
 
 /** A message store for MQTT stream source for SQL Streaming. */
@@ -89,8 +90,11 @@ object JavaSerializer {
  * A message store to persist messages received. This is not intended to be thread safe.
  * It uses `MqttDefaultFilePersistence` for storing messages on disk locally on the client.
  */
-private[mqtt] class LocalMessageStore(val persistentStore: MqttClientPersistence,
-    val serializer: Serializer) extends MessageStore with Logging {
+class LocalMessageStore(
+  val persistentStore: MqttClientPersistence,
+  val serializer: Serializer) extends MessageStore
+  with Serializable
+  with Logging {
 
   def this(persistentStore: MqttClientPersistence) =
     this(persistentStore, JavaSerializer.getInstance())

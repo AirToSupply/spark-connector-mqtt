@@ -23,16 +23,11 @@ class MQTTStreamSink(
   override def addBatch(batchId: Long, data: DataFrame): Unit = {
     if (batchId <= latestBatchId) {
       log.info(s"Skipping already committed batch $batchId")
+    } else {
+      MQTTWriter.write(sqlContext.sparkSession, data.queryExecution, parameters,
+        topic, qos)
+      latestBatchId = batchId
     }
-
-    MQTTWriter.write(
-      sqlContext.sparkSession,
-      data.queryExecution,
-      parameters,
-      topic,
-      qos)
-
-    latestBatchId = batchId
   }
 
   override def toString: String =

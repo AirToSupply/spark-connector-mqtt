@@ -1,11 +1,11 @@
 package org.apache.spark.sql.mqtt.offset
 
-import org.apache.spark.sql.execution.streaming.{Offset, SerializedOffset, Offset => OffsetV2}
+import org.apache.spark.sql.execution.streaming.{SerializedOffset, Offset}
 
 /**
  * A simple offset for sources that produce a single linear stream of data.
  */
-case class LongOffset(offset: Long) extends OffsetV2 {
+case class LongOffset(offset: Long) extends Offset {
 
   override val json = offset.toString
 

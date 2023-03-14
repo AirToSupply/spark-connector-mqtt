@@ -1,6 +1,7 @@
 package org.apache.spark.sql.example
 
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.mqtt.provider.MQTTStreamSourceProvider
 
 /**
  * Counts words in UTF8 encoded, '\n' delimited text received from MQTT Server.
@@ -32,7 +33,7 @@ object MQTTStreamWordCount  {
 
     // Create DataFrame representing the stream of input lines from connection to mqtt server
     val lines = spark.readStream
-      .format("mqtt")
+      .format(classOf[MQTTStreamSourceProvider].getName)
       .option("topic", topic).option("persistence", "memory")
       .load(brokerUrl).selectExpr("CAST(payload AS STRING)").as[String]
 

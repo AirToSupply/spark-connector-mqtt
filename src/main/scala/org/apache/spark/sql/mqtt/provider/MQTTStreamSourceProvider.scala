@@ -6,6 +6,7 @@ import org.apache.spark.sql.execution.streaming.Source
 import org.apache.spark.sql.mqtt.config.MQTTConfiguration
 import org.apache.spark.sql.mqtt.convertor.MQTTRecordToRowConvertor
 import org.apache.spark.sql.mqtt.source.MQTTStreamSource
+import org.apache.spark.sql.mqtt.store.LocalMessageStore
 import org.apache.spark.sql.sources.{DataSourceRegister, StreamSourceProvider}
 import org.apache.spark.sql.types.StructType
 

@@ -10,6 +10,7 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.mqtt.provider.MQTTStreamSinkProvider;
 import org.apache.spark.sql.streaming.StreamingQuery;
 
 /**
@@ -63,7 +64,7 @@ public class JavaMQTTSinkWordCount {
 
         // Start publishing the counts to MQTT server.
         StreamingQuery query = wordCounts.writeStream()
-                .format("mqtt")
+                .format(MQTTStreamSinkProvider.class.getName())
                 .option("checkpointLocation", checkpointDir)
                 .outputMode("complete")
                 .option("topic", topic)

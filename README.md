@@ -45,8 +45,8 @@ SQL Stream can be created with data streams received through MQTT Server using:
 
 ```scala
 sqlContext.readStream
-    .format("tech.odes.sql.streaming.mqtt.MQTTStreamSourceProvider")
-    .option("topic", "mytopic")
+    .format(classOf[MQTTStreamSourceProvider].getName)
+    .option("topic", "sensor/data")
     .load("tcp://localhost:1883")
 ```
 
@@ -54,11 +54,11 @@ SQL Stream may be also transferred into MQTT messages using:
 
 ```scala
 sqlContext.writeStream
-    .format("tech.odes.sql.streaming.mqtt.MQTTStreamSinkProvider")
+    .format(classOf[MQTTStreamSinkProvider].getName)
     .option("checkpointLocation", "/path/to/localdir")
     .outputMode("complete")
-    .option("topic", "mytopic")
-    .load("tcp://localhost:1883")
+    .option("topic", "sensor/data")
+    .start("tcp://localhost:1883")
 ```
 
 ## Source recovering from failures
@@ -67,8 +67,8 @@ Setting values for option `localStorage` and `clientId` helps in recovering in c
 
 ```scala
 sqlContext.readStream
-    .format("tech.odes.sql.streaming.mqtt.MQTTStreamSourceProvider")
-    .option("topic", "mytopic")
+    .format(classOf[MQTTStreamSourceProvider].getName)
+    .option("topic", "sensor/data")
     .option("localStorage", "/path/to/localdir")
     .option("clientId", "some-client-id")
     .load("tcp://localhost:1883")
@@ -119,7 +119,7 @@ An example, for scala API to count words from incoming message stream.
 ```scala
 // Create DataFrame representing the stream of input lines from connection to mqtt server
 val lines = spark.readStream
-  .format("org.apache.bahir.sql.streaming.mqtt.MQTTStreamSourceProvider")
+  .format(classOf[MQTTStreamSourceProvider].getName)
   .option("topic", topic)
   .load(brokerUrl).selectExpr("CAST(payload AS STRING)").as[String]
 
@@ -148,7 +148,7 @@ An example, for Java API to count words from incoming message stream.
     // Create DataFrame representing the stream of input lines from connection to mqtt server.
     Dataset<String> lines = spark
             .readStream()
-            .format("org.apache.bahir.sql.streaming.mqtt.MQTTStreamSourceProvider")
+            .format(MQTTStreamSourceProvider.class.getName())
             .option("topic", topic)
             .load(brokerUrl)
             .selectExpr("CAST(payload AS STRING)").as(Encoders.STRING());
@@ -189,7 +189,7 @@ The design of Mqtt and the purpose it serves goes well together, but often in an
 ```scala
 // Create DataFrame representing the stream of binary messages
 val lines = spark.readStream
-  .format("org.apache.bahir.sql.streaming.mqtt.MQTTStreamSourceProvider")
+  .format(classOf[MQTTStreamSourceProvider].getName)
   .option("topic", topic)
   .load(brokerUrl).select("payload").as[Array[Byte]].map(externalParser(_))
 ```
@@ -199,7 +199,7 @@ val lines = spark.readStream
 // Create DataFrame representing the stream of binary messages
 Dataset<byte[]> lines = spark
         .readStream()
-        .format("org.apache.bahir.sql.streaming.mqtt.MQTTStreamSourceProvider")
+        .format(MQTTStreamSourceProvider.class.getName())
         .option("topic", topic)
         .load(brokerUrl).selectExpr("CAST(payload AS BINARY)").as(Encoders.BINARY());
 

@@ -1,12 +1,14 @@
 package org.apache.spark.sql.mqtt.source
 
+import org.apache.spark.SparkContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.execution.streaming.{Offset, Source, Offset => OffsetV2}
+import org.apache.spark.sql.execution.streaming.{Offset => OffsetV2, Source}
 import org.apache.spark.sql.mqtt.convertor.MQTTRecordToRowConvertor
 import org.apache.spark.sql.mqtt.offset.LongOffset
 import org.apache.spark.sql.mqtt.rdd.{MQTTOffsetRange, MQTTSourceRDD}
-import org.apache.spark.sql.mqtt.store.{LocalMessageStore, MQTTMessage}
+import org.apache.spark.sql.mqtt.source.MQTTStreamSource.{createLocalMessageStore, createMQTTSourceRDD, messageStore}
+import org.apache.spark.sql.mqtt.store.{LocalMessageStore, MQTTMessage, MessageStore}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SQLContext}
 import org.apache.spark.unsafe.types.UTF8String
@@ -14,6 +16,33 @@ import org.eclipse.paho.client.mqttv3._
 
 import javax.annotation.concurrent.GuardedBy
 import scala.collection.concurrent.TrieMap
+
+object MQTTStreamSource extends Logging {
+
+  private var _messageStore: LocalMessageStore = _
+
+  def createLocalMessageStore(persistence: MqttClientPersistence): Unit = {
+    _messageStore = new LocalMessageStore(persistence)
+  }
+
+  def messageStore = _messageStore
+
+  def createMQTTSourceRDD(
+      sc: SparkContext,
+      offsetRanges: Seq[MQTTOffsetRange],
+      messages: TrieMap[Long, MQTTMessage]): MQTTSourceRDD =
+    new MQTTSourceRDD(
+      sc,
+      offsetRanges,
+      messages,
+      storeFunction)
+
+  private def storeFunction: (Long, Long) => Map[Long, MQTTMessage] = {
+    (start: Long, end: Long) => (start to end).map { idx =>
+      (idx, messageStore.retrieve[MQTTMessage](idx))
+    }.toMap[Long, MQTTMessage]
+  }
+}
 
 /**
  * A mqtt stream source.
@@ -60,10 +89,9 @@ class MQTTStreamSource(
 
   /**
    * Older than last N messages, will not be checked for redelivery.
+   * TO DO
    */
-  val backLog = options.getOrElse("autopruning.backlog", "500").toInt
-
-  private val store = new LocalMessageStore(persistence)
+  private val backLog = options.getOrElse("autopruning.backlog", "500").toInt
 
   private val messages = new TrieMap[Long, MQTTMessage]
 
@@ -84,6 +112,8 @@ class MQTTStreamSource(
    */
   private def initialize(): Unit = {
 
+    createLocalMessageStore(persistence)
+
     client = new MqttClient(brokerUrl, clientId, persistence)
 
     val callback = new MqttCallbackExtended() {
@@ -92,9 +122,18 @@ class MQTTStreamSource(
         val mqttMessage = new MQTTMessage(message, topic_)
         val offset = currentOffset.offset + 1L
         messages.put(offset, mqttMessage)
-        store.store(offset, mqttMessage)
+        messageStore.store(offset, mqttMessage)
         currentOffset = LongOffset(offset)
+
         log.trace(s"Message arrived, $topic_ $mqttMessage")
+        log.info(
+          s"""
+             |------------------------------------------
+             |MQTT Message Arriving:
+             |------------------------------------------
+             |currentOffset: ${currentOffset}
+             |------------------------------------------
+             |""".stripMargin)
       }
 
       override def deliveryComplete(token: IMqttDeliveryToken): Unit = {
@@ -131,7 +170,18 @@ class MQTTStreamSource(
    *
    * @return Option[Offset]
    */
-  override def getOffset: Option[Offset] = Some(getCurrentOffset)
+  override def getOffset: Option[OffsetV2] = {
+    log.info(
+      s"""
+         |------------------------------------------
+         |Streming -> GetOffset
+         |------------------------------------------
+         |currentOffset: ${getCurrentOffset}
+         |------------------------------------------
+         |""".stripMargin)
+
+    Some(getCurrentOffset)
+  }
 
   private def getOffsetRangesFromResolvedOffsets(
       start: Long, end: Long, numPartitions: Int): Array[MQTTOffsetRange] = {
@@ -141,24 +191,27 @@ class MQTTStreamSource(
 
     val ranges = Array.ofDim[MQTTOffsetRange](numPartitions)
     val num = end - start + 1
-    val (delta, mod) = num % numPartitions match {
+    val (delta, mod): (Long, Long) = num % numPartitions match {
       case 0 => (num / numPartitions, 0)
       case _@m => (num / numPartitions + 1, m)
     }
+
     for (idx <- 1 to numPartitions) {
-      val (from, to) = mod match {
+      val (from, to): (Long, Long) = mod match {
         case 0 =>
           val from = start + (idx - 1) * delta
           val to = from + (delta - 1)
           (from, to)
-        case _ =>
-          val from = idx match {
-            case numPartitions => end - (mod - 1)
-            case _ => start + (idx - 1) * delta
+        case _@m =>
+          val from = if (idx == numPartitions) {
+            end - m + 1
+          } else {
+            start + (idx - 1) * delta
           }
-          val to = idx match {
-            case numPartitions => end
-            case _ => from + (delta - 1)
+          val to = if (idx == numPartitions) {
+            end
+          } else {
+            from + (delta - 1)
           }
           (from, to)
       }
@@ -177,11 +230,24 @@ class MQTTStreamSource(
    * @return
    */
   override def getBatch(start: Option[OffsetV2], end: OffsetV2): DataFrame = {
-    log.info(s"GetBatch called with start = $start, end = $end")
+    log.info(
+      s"""
+         |------------------------------------------
+         |Streaming -> GetBatch
+         |------------------------------------------
+         |Called with start = $start, end = $end
+         |------------------------------------------
+         |currentOffset: ${getCurrentOffset}
+         |------------------------------------------
+         |""".stripMargin)
+
     setOffsetRange(start, Some(end))
 
     val sc = sqlContext.sparkContext
     val numPartitions = sc.defaultParallelism
+
+    sqlContext.internalCreateDataFrame(
+      sc.emptyRDD[InternalRow].setName("empty"), schema, isStreaming = true)
 
     if (start.isDefined && start.get == end) {
       return sqlContext.internalCreateDataFrame(
@@ -190,11 +256,9 @@ class MQTTStreamSource(
 
     val sliceStart = LongOffset.convert(startOffset).get.offset + 1
     val sliceEnd = LongOffset.convert(endOffset).get.offset + 1
-    val offsetRanges: Seq[MQTTOffsetRange] =
-      getOffsetRangesFromResolvedOffsets(sliceStart, sliceEnd, numPartitions)
+    val offsetRanges: Seq[MQTTOffsetRange] = getOffsetRangesFromResolvedOffsets(sliceStart, sliceEnd, numPartitions)
 
-    val rdd = new MQTTSourceRDD(
-      sc, offsetRanges, messages, store).map { mm =>
+    val rdd = createMQTTSourceRDD(sc, offsetRanges, messages).map { mm =>
       InternalRow(
         mm.id,
         UTF8String.fromString(mm.topic),
@@ -209,11 +273,34 @@ class MQTTStreamSource(
       rdd.setName("mqtt"), schema, isStreaming = true)
   }
 
+  /**
+   * Remove the data file for the offset from starage.
+   */
   override def commit(end: OffsetV2): Unit = synchronized {
+    log.info(
+      s"""
+         |------------------------------------------
+         |Streaming -> Commit
+         |------------------------------------------
+         |Called with end = ${end}
+         |""".stripMargin)
 
     val newOffset = LongOffset.convert(end).getOrElse(sys.error(
       s"MQTTStreamSource.commit() received an offset ($end) that did not originate with an instance of this class")
     )
+
+    if (newOffset.offset == -1) {
+      log.info(
+        s"""
+           |------------------------------------------
+           |No setting lastOffsetCommitted and No Delete from storage
+           |------------------------------------------
+           |currentOffset: ${getCurrentOffset}
+           |lastOffsetCommitted: ${lastOffsetCommitted}
+           |------------------------------------------
+           |""".stripMargin)
+      return
+    }
 
     val offsetDiff = (newOffset.offset - lastOffsetCommitted.offset).toInt
 
@@ -221,11 +308,22 @@ class MQTTStreamSource(
       sys.error(s"Offsets committed out of order: $lastOffsetCommitted followed by $end")
     }
 
+    // delete
     (lastOffsetCommitted.offset until newOffset.offset).foreach { x =>
       messages.remove(x + 1)
-      store.remove(x + 1)
+      messageStore.remove(x + 1)
     }
     lastOffsetCommitted = newOffset
+
+    log.info(
+      s"""
+         |------------------------------------------
+         |Deleted from storage from ${lastOffsetCommitted.offset} until ${newOffset.offset}
+         |------------------------------------------
+         |currentOffset: ${getCurrentOffset}
+         |lastOffsetCommitted: ${lastOffsetCommitted}
+         |------------------------------------------
+         |""".stripMargin)
   }
 
   /**

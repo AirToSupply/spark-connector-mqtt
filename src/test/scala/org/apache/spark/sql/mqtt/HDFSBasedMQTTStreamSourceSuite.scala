@@ -171,7 +171,7 @@ class BasicHDFSBasedMQTTSourceSuite extends HDFSBasedMQTTStreamSourceSuite {
       provider.createSource(
         sqlContext,
         s"hdfs://localhost:${hadoop.getNameNodePort}/testCheckpoint/0",
-        Some(MQTTRecordToRowConverter.schema),
+        Some(MQTTRecordToRowConvertor.schema),
         "org.apache.spark.sql.mqtt.provider.HDFSMQTTSourceProvider",
         Map()
       )

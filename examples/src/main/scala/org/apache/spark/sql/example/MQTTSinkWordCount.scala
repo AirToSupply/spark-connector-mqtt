@@ -2,6 +2,7 @@ package org.apache.spark.sql.example
 
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.mqtt.provider.MQTTStreamSinkProvider
 
 import java.io.File
 
@@ -55,7 +56,7 @@ object MQTTSinkWordCount  {
 
     // Start publishing the counts to MQTT server.
     val query = wordCounts.writeStream
-      .format("mqtt")
+      .format(classOf[MQTTStreamSinkProvider].getName)
       .option("checkpointLocation", checkpointDir)
       .outputMode("complete")
       .option("topic", topic)
