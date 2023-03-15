@@ -28,12 +28,12 @@
 
   <properties>
     <!-- Scala Version -->
-    <scala.version>2.12.7</scala.version>
+    <scala.version>2.12.8</scala.version>
     <scala.binary.version>2.12</scala.binary.version>
     <scala.test.version>3.1.4</scala.test.version>
 
     <!-- Spark Version -->
-    <spark.version>3.1.1</spark.version>
+    <spark.version>3.2.3</spark.version>
 
     <!-- MQTT Client -->
     <mqtt.paho.client>1.1.0</mqtt.paho.client>
@@ -42,7 +42,7 @@
     <activemq.mqtt.version>5.13.3</activemq.mqtt.version>
 
     <!-- Hadoop version -->
-    <hadoop.version>3.1.0</hadoop.version>
+    <hadoop.version>3.2.0</hadoop.version>
   </properties>
 
   <distributionManagement>
